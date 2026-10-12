@@ -7,7 +7,9 @@ authors = [
     { name = "GekkeGringo", email = "gekke_gringo@icloud.com" }
 ]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "python-docx>=1.2.0",
+]
 
 [project.scripts]
 rag-labor-code = "rag_labor_code:main"
@@ -15,3 +17,8 @@ rag-labor-code = "rag_labor_code:main"
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
