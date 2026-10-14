@@ -1,20 +1,23 @@
 import json
 import re
+import sys
 from pathlib import Path
 
+ans_path = sys.argv[1] if len(sys.argv) > 1 else "data/answers_dev.json"
 ctx = json.loads(Path("data/contexts_dev.json").read_text(encoding="utf-8"))
 ans = {
     x["id"]: x["answer"]
-    for x in json.loads(Path("data/answers_dev.json").read_text(encoding="utf-8"))
+    for x in json.loads(Path(ans_path).read_text(encoding="utf-8"))
 }
 CITE = re.compile(r"ст\.\s*(\d+(?:\.\d+)*(?:-\d+)?)")
 
 n_ans = n_refused = n_ctx_ok = n_cited_ok = n_answered = n_bad_cite = 0
 n_no = n_no_refused = 0
 
+print("файл ответов:", ans_path)
 for item in ctx:
     a = ans[item["id"]]
-    refused = "ответа нет" in a.lower()
+    refused = not CITE.search(a) and bool(re.search(r"\bнет\b", a.lower()))
     cited = set(CITE.findall(a))
     in_ctx = [c["article"] for c in item["contexts"]]
     gold = set(item["gold_articles"])
@@ -42,6 +45,8 @@ for item in ctx:
 print()
 print(f"вопросов с ответом: {n_ans}; нужные статьи в контексте: {n_ctx_ok}")
 print(f"ложных отказов: {n_refused} из {n_ans}")
-print(f"из {n_answered} ответов нужные статьи процитированы в {n_cited_ok}, "
-      f"в {n_bad_cite} есть ссылка на статью вне контекста")
+print(
+    f"из {n_answered} ответов нужные статьи процитированы в {n_cited_ok}, "
+    f"в {n_bad_cite} есть ссылка на статью вне контекста"
+)
 print(f"вопросов без ответа: {n_no}; правильных отказов: {n_no_refused}")
