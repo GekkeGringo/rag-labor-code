@@ -28,3 +28,8 @@ class DenseIndex:
                 if len(result) == k:
                     break
         return result
+
+    def search_chunks(self, query: str, k: int = 5) -> list[Chunk]:
+        q = self.model.encode(["query: " + query], normalize_embeddings=True)[0]
+        order = np.argsort(-(self.emb @ q))[:k]
+        return [self.chunks[i] for i in order]
