@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from rag_labor_code.chunker import Chunk, chunk_articles
 from rag_labor_code.parser import parse
+from rag_labor_code.pipeline import INDEX_DIR
 
 NOTE = "Учебный проект, не юридическая консультация. Ответ без языковой модели: показан наиболее релевантный фрагмент кодекса."
 
@@ -31,6 +32,9 @@ def build_index():
     # импорт здесь, чтобы тесты не загружали torch и модель
     from rag_labor_code.dense import DenseIndex
 
+    pointer = INDEX_DIR / "CURRENT.txt"
+    if pointer.exists():
+        return DenseIndex.load(INDEX_DIR / pointer.read_text(encoding="utf-8").strip())
     arts = parse(Path("data/raw/tk_rf.txt").read_text(encoding="utf-8"))
     chunks = [replace(c, text=f"{c.chapter}\n{c.text}") for c in chunk_articles(arts, 1500)]
     return DenseIndex(chunks)
