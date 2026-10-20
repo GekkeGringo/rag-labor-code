@@ -4,7 +4,7 @@ import json
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-path = glob.glob("/kaggle/input/**/contexts_dev.json", recursive=True)[0]
+path = glob.glob("/kaggle/input/**/contexts_test.json", recursive=True)[0]
 data = json.load(open(path, encoding="utf-8"))
 
 MODEL = "Qwen/Qwen2.5-7B-Instruct"
@@ -17,32 +17,36 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 print("модель загружена, вопросов:", len(data))
 
-SYSTEM = (
+SYSTEM_RAG = (
     "Ты помощник по Трудовому кодексу РФ. Отвечай на вопрос ТОЛЬКО на основе "
     "приведенных фрагментов кодекса, на русском языке, кратко (до 5 предложений). "
     "После каждого утверждения указывай статью в формате [ст. 123]. "
     "Если во фрагментах нет ответа на вопрос, напиши ровно: "
     "'В найденных статьях ответа нет.' и ничего больше. Ничего не придумывай."
 )
+SYSTEM_CLOSED = (
+    "Ты помощник по Трудовому кодексу РФ. Ответь на вопрос на русском языке, "
+    "кратко (до 5 предложений). Если помнишь статью Трудового кодекса, укажи ее "
+    "в формате [ст. 123]. Если в Трудовом кодексе ответа на вопрос нет или ты его "
+    "не знаешь, напиши ровно: 'В Трудовом кодексе ответа нет.' и ничего больше. "
+    "Ничего не придумывай."
+)
 
-results = []
-for item in data:
-    ctx = "\n\n---\n\n".join(c["text"] for c in item["contexts"])
-    user_text = f"Фрагменты:\n\n{ctx}\n\nВопрос: {item['question']}"
-    messages = [
-        {"role": "system", "content": SYSTEM},
-        {"role": "user", "content": user_text},
-    ]
-    text = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    inputs = tok(text, return_tensors="pt").to(model.device)
-    with torch.no_grad():
-        out = model.generate(**inputs, max_new_tokens=400, do_sample=False)
-    answer = tok.decode(out[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-    results.append({"id": item["id"], "answer": answer})
-    print(item["id"], "|", answer[:200].replace("\n", " "))
-    torch.cuda.empty_cache()
 
-with open("/kaggle/working/answers_dev.json", "w", encoding="utf-8") as f:
-    json.dump(results, f, ensure_ascii=False, indent=1)
-print("=== ANSWERS JSON ===")
-print(json.dumps(results, ensure_ascii=False))
+def ctx_text(contexts):
+    return "\n\n---\n\n".join(c["text"] for c in contexts)
+
+
+def build(mode, item):
+    q = item["question"]
+    if mode == "rag":
+        return SYSTEM_RAG, f"Фрагменты:\n\n{ctx_text(item['contexts'])}\n\nВопрос: {q}"
+    if mode == "oracle":
+        if "oracle_contexts" not in item:
+            return None
+        return SYSTEM_RAG, f"Фрагменты:\n\n{ctx_text(item['oracle_contexts'])}\n\nВопрос: {q}"
+    return SYSTEM_CLOSED, f"Вопрос: {q}"
+
+r_rag = run("rag")
+r_oracle = run("oracle")
+r_closed = run("closed")
